@@ -4,6 +4,8 @@ import aiohttp
 from aiohttp import web
 import os
 import json
+import importlib
+from . import handlers
 
 # Define the directory for the node (standard boilerplate)
 NODE_CLASS_MAPPINGS = {}
@@ -13,66 +15,18 @@ WEB_DIRECTORY = "./js"
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
 
 # =============================================================================
-# Routes & Handlers
+# Routes & Handlers (Hot Reload Proxy)
 # =============================================================================
 
-# Store the current workflow state (pushed from frontend or retrieved)
-current_workflow = {}
-
 async def workflow_handler(request):
-    """Handle get/set of current workflow."""
-    global current_workflow
-    if request.method == "POST":
-        data = await request.json()
-        # Ensure we store it in the expected structure
-        if "workflow" in data:
-             current_workflow = data
-        else:
-             current_workflow = {"workflow": data}
-        return web.json_response({"status": "ok"})
-    else:
-        # Return nested structure if it's just raw data
-        if "workflow" not in current_workflow and current_workflow:
-            return web.json_response({"workflow": current_workflow})
-        return web.json_response(current_workflow)
+    """Proxy to handlers.workflow_handler with auto-reload."""
+    importlib.reload(handlers)
+    return await handlers.workflow_handler(request)
 
 async def run_node_handler(request):
-    """Run specific nodes."""
-    try:
-        data = await request.json()
-        node_id = data.get("node_id")
-        
-        # Access ComfyUI's PromptServer instance
-        s = server.PromptServer.instance
-        
-        # We need the current workflow prompt to queue it
-        # If we have the live workflow state, use it
-        prompt = current_workflow.get("workflow", {})
-        if not prompt:
-             return web.json_response({"error": "No active workflow to run"}, status=400)
-
-        # Generate a prompt ID
-        import uuid
-        prompt_id = str(uuid.uuid4())
-        
-        # This is a simplified queue method. 
-        # In a real scenario, we might want to filter the prompt to only the sub-graph upstream of node_id
-        # For now, we queue the whole thing but typically we'd use the backend API logic
-        
-        # Queue using the internal prompt queue
-        # (number, prompt_id, prompt, extra_data, outputs_to_execute)
-        # outputs_to_execute is what limits execution to specific nodes!
-        node_ids_to_execute = [str(node_id)] if node_id else []
-        
-        s.prompt_queue.put(
-            (0, prompt_id, prompt, {"client_id": "claude-mcp"}, node_ids_to_execute)
-        )
-        
-        return web.json_response({"status": "queued", "prompt_id": prompt_id, "node_id": node_id})
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return web.json_response({"error": str(e)}, status=500)
+    """Proxy to handlers.run_node_handler with auto-reload."""
+    importlib.reload(handlers)
+    return await handlers.run_node_handler(request)
 
 # =============================================================================
 # Setup

@@ -96,3 +96,17 @@ Ask "Is the queue full?". The agent can check **`get_status`** to see running jo
 
 **"Connection refused"**
 *   By default, it tries to connect to `http://127.0.0.1:8188`. If you run ComfyUI on a different port, check the `.comfyui_url` file in the custom node folder.
+
+
+---
+
+## 🧑‍💻 For Developers
+
+This node includes a **Integrated Hot Reload** mechanism.
+
+-   **Logic**: `handlers.py` (Edit this! It reloads instantly).
+-   **State**: `state.py` (Stores data like the workflow. Persists across reloads).
+
+This means you can modify the API logic in real-time without losing your current test data.
+
+For general Custom Node development, we recommend [ComfyUI_devtools](https://github.com/Comfy-Org/ComfyUI_devtools), which provides comprehensive hot-reload and profiling tools for the entire ComfyUI ecosystem.
