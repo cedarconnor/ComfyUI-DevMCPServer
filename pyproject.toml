@@ -17,7 +17,7 @@ dev = [
 ]
 
 [project.scripts]
-comfyui-dev-mcp = "comfyui_mcp_server:main"
+mcp-server-comfyui = "mcp_server:main"
 
 [build-system]
 requires = ["hatchling"]

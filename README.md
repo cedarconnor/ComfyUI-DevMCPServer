@@ -1,281 +1,98 @@
-# ComfyUI Dev MCP Server
+# ComfyUI-MCP-Server
 
-An MCP server that closes the development loop between your coding agent (Claude Code, Cursor, Claude.ai, etc.) and ComfyUI. No more manual copy-pasting of error logs!
+**Your AI Agent's Gateway to ComfyUI.**
 
-## What It Does
+This tool lets your favorite AI coding assistant (Claude, Cursor, Windsurf, etc.) "talk" directly to ComfyUI. This means your agent can:
+- 🚫 **See Errors automatically** without you copying logs.
+- 🧐 **Understand your workflow** by reading the node graph.
+- 🚀 **Run and fix workflows** directly from the chat.
 
-```
-┌─────────────┐     ┌──────────────────┐     ┌──────────────┐
-│ Your Code   │────>│   ComfyUI        │────>│  Log File    │
-│   Editor    │     │   (running)      │     │              │
-└─────────────┘     └──────────────────┘     └──────┬───────┘
-       ▲                                            │
-       │            ┌──────────────────┐            │
-       │            │  MCP Server      │<───────────┘
-       └────────────│  (this tool)     │  watches & parses
-                    └──────────────────┘
-```
-
-**Features:**
-- **Error Detection**: Automatically parses ComfyUI logs for Python tracebacks, extracting error type, message, file locations, and which custom node caused it
-- **Log Tailing**: Query recent logs or search for specific patterns
-- **File Watching**: See which files changed in custom_nodes (useful for knowing what triggered a reload)
-- **ComfyUI API**: Check status, queue workflows, interrupt execution, query available nodes
-- **Agent-Friendly Output**: Errors formatted with markdown for easy consumption by LLMs
-
-## Quick Start
-
-### 1. Install
-
-```bash
-# Clone or download this directory
-cd comfyui-dev-mcp
-
-# Install with pip
-pip install -e .
-
-# Or just install dependencies
-pip install mcp httpx watchdog
-```
-
-### 2. Configure
-
-```bash
-cp .env.example .env
-# Edit .env with your paths:
-#   COMFYUI_PATH=/path/to/ComfyUI
-#   COMFYUI_LOG=/path/to/ComfyUI/comfyui.log
-```
-
-### 3. Run ComfyUI with Logging
-
-ComfyUI doesn't write to a log file by default. Run it like this:
-
-```bash
-cd /path/to/ComfyUI
-python main.py 2>&1 | tee comfyui.log
-```
-
-Or on Windows:
-```powershell
-python main.py 2>&1 | Tee-Object -FilePath comfyui.log
-```
-
-### 4. Connect Your Agent
-
-See setup instructions for your specific tool below.
+It works by running a small "Server" that speaks the **Model Context Protocol (MCP)**, a standard language for AI tools.
 
 ---
 
-## Setup for Different Tools
+## 📦 Installation
 
-### Claude Code
+This project is installed as a **ComfyUI Custom Node**.
 
-Add to your Claude Code MCP config (`~/.claude/claude_desktop_config.json` or project-level):
+### Option 1: Manager (Recommended)
+*Coming soon to ComfyUI Manager!*
 
+### Option 2: Manual Install (Git)
+1.  Open your terminal/command prompt.
+2.  Navigate to your ComfyUI custom nodes folder:
+    ```bash
+    cd /path/to/ComfyUI/custom_nodes
+    ```
+3.  Clone this repository:
+    ```bash
+    git clone https://github.com/cedarconnor/ComfyUI-DevMCPServer.git
+    ```
+4.  **Restart ComfyUI**.
+
+---
+
+## 🤖 Connect Your Agent
+
+Once installed, you need to tell your AI Agent where to find this server.
+
+### 🟣 Claude Desktop / Claude Code
+Add this to your `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "comfyui-dev": {
+    "comfyui": {
       "command": "python",
-      "args": ["/path/to/comfyui-dev-mcp/comfyui_mcp_server.py"],
-      "env": {
-        "COMFYUI_PATH": "/path/to/ComfyUI",
-        "COMFYUI_LOG": "/path/to/ComfyUI/comfyui.log"
-      }
+      "args": ["/path/to/ComfyUI/custom_nodes/ComfyUI-DevMCPServer/mcp_server.py"]
     }
   }
 }
 ```
+*(Replace `/path/to/...` with the actual path to the folder)*
 
-Then in Claude Code, you can say things like:
-- "Check for any ComfyUI errors"
-- "What's in the recent ComfyUI logs?"
-- "Is ComfyUI running?"
+### 🔵 Cursor
+1.  Go to **Settings** > **Features** > **MCP Servers**.
+2.  Click **+ Add New MCP Server**.
+3.  Fill in the details:
+    *   **Name**: `comfyui`
+    *   **Type**: `command`
+    *   **Command**: `python /path/to/ComfyUI/custom_nodes/ComfyUI-DevMCPServer/mcp_server.py`
 
-### Cursor
-
-Add to your Cursor MCP settings (Settings → MCP Servers):
-
-```json
-{
-  "comfyui-dev": {
-    "command": "python",
-    "args": ["/path/to/comfyui-dev-mcp/comfyui_mcp_server.py"],
-    "env": {
-      "COMFYUI_PATH": "/path/to/ComfyUI",
-      "COMFYUI_LOG": "/path/to/ComfyUI/comfyui.log"
-    }
-  }
-}
-```
-
-### Claude.ai Desktop (with MCP)
-
-If you have MCP enabled in Claude.ai desktop, add to your config:
-
-```json
-{
-  "mcpServers": {
-    "comfyui-dev": {
-      "command": "python",
-      "args": ["/path/to/comfyui-dev-mcp/comfyui_mcp_server.py"],
-      "env": {
-        "COMFYUI_PATH": "/path/to/ComfyUI",
-        "COMFYUI_LOG": "/path/to/ComfyUI/comfyui.log"
-      }
-    }
-  }
-}
-```
-
-### Other MCP-Compatible Tools
-
-The server uses standard MCP protocol over stdio. Any MCP client can connect by running:
-
+### 🌊 Windsurf / Gemini / Other CLI
+Most CLI agents accept an MCP configuration flag or config file. Use the command:
 ```bash
-python /path/to/comfyui_mcp_server.py
+python /path/to/ComfyUI/custom_nodes/ComfyUI-DevMCPServer/mcp_server.py
 ```
 
 ---
 
-## Available Tools
+## 🛠 Features & Usage
 
-### `get_comfy_errors`
-Get recent errors and tracebacks from ComfyUI.
+Once connected, you can ask your agent to do things like:
 
-```
-Arguments:
-  count: int = 5      # Number of errors to return
-  clear: bool = false # Clear error history after returning
-```
+### 1. "What is in my workflow?"
+The agent uses **`get_workflow`** to see your current node graph. It can explain what your workflow does or suggest improvements.
 
-Example output:
-```markdown
-## Error: ModuleNotFoundError
-**Time:** 2024-01-15T10:30:45
-**Node:** ComfyUI-MyCustomNode
-**File:** /path/to/custom_nodes/ComfyUI-MyCustomNode/nodes.py
-**Message:** No module named 'some_package'
+### 2. "Fix this error"
+If a generation fails, just ask "Why did that fail?". The agent skips the guessing game and uses **`get_status`** and log reading tools to see the exact error message and traceback from ComfyUI.
 
-**Traceback:**
-```python
-Traceback (most recent call last):
-  File "/path/to/custom_nodes/ComfyUI-MyCustomNode/nodes.py", line 5, in <module>
-    import some_package
-ModuleNotFoundError: No module named 'some_package'
-```
-```
+### 3. "Find a node for..."
+Ask "Is there a node for IPAdapter?". The agent uses **`get_node_types`** to search your installed nodes and find the right one for the job.
 
-### `get_comfy_logs`
-Get recent log output from ComfyUI.
-
-```
-Arguments:
-  count: int = 100  # Number of lines to return
-  search: str       # Optional regex pattern to filter
-```
-
-### `get_comfy_status`
-Check if ComfyUI is running and get system stats.
-
-Returns:
-- Running status
-- Queue status (pending/running jobs)
-- System stats (memory, GPU info if available)
-- Error count in buffer
-
-### `get_file_changes`
-See recent file changes in custom_nodes directory.
-
-```
-Arguments:
-  count: int = 20  # Number of changes to return
-```
-
-### `queue_workflow`
-Queue a workflow for execution.
-
-```
-Arguments:
-  workflow: object  # The ComfyUI workflow JSON
-```
-
-### `interrupt_comfy`
-Interrupt the currently running execution.
-
-### `get_node_info`
-Get information about available nodes.
-
-```
-Arguments:
-  node_name: str  # Optional - specific node to query, or list all
-```
+### 4. "Check status"
+Ask "Is the queue full?". The agent can check **`get_status`** to see running jobs, system resources (VRAM/RAM), and more.
 
 ---
 
-## Combining with Hot Reload
+## ❓ Troubleshooting
 
-For the best development experience, combine this with ComfyUI-HotReloadHack or ComfyUI_devtools:
+**"MCP Server connection failed"**
+*   Make sure you used the full absolute path to `mcp_server.py`.
+*   Ensure you have Python installed and accessible.
 
-1. Install hot reload: `cd custom_nodes && git clone https://github.com/logtd/ComfyUI-HotReloadHack`
-2. Run ComfyUI with logging
-3. Connect your agent via MCP
+**"No workflow found"**
+*   Make sure ComfyUI is running.
+*   The server needs to be installed as a Custom Node (in `custom_nodes` folder) for it to see the live workflow.
 
-Now your workflow becomes:
-```
-Edit code → Auto-reload (HotReloadHack) → Error appears → Agent sees it (MCP) → Agent suggests fix
-```
-
----
-
-## Example Agent Interactions
-
-### "Fix my node error"
-
-Agent will:
-1. Call `get_comfy_errors` to see what failed
-2. See the traceback pointing to your file
-3. Suggest the fix based on the error
-
-### "Run my test workflow and check for errors"
-
-Agent will:
-1. Call `queue_workflow` with your workflow JSON
-2. Wait a moment
-3. Call `get_comfy_errors` to see if anything failed
-4. Report results or suggest fixes
-
-### "What changed since my last edit?"
-
-Agent will:
-1. Call `get_file_changes` to see modified files
-2. Call `get_comfy_logs` with a search for those files
-3. Summarize what happened
-
----
-
-## Troubleshooting
-
-### "Log watcher not initialized"
-- Make sure `COMFYUI_LOG` points to an existing file
-- Make sure ComfyUI is running with `2>&1 | tee comfyui.log`
-
-### "Could not get node info. Is ComfyUI running?"
-- Check that ComfyUI is running
-- Check `COMFYUI_API` URL is correct (default: http://127.0.0.1:8188)
-
-### "File watcher not initialized"
-- Install watchdog: `pip install watchdog`
-- Make sure `COMFYUI_PATH` points to your ComfyUI directory
-
-### No errors showing up
-- Errors are parsed from the log file in real-time
-- Make sure your ComfyUI output is going to the log file
-- Try `get_comfy_logs` to see if logs are being captured
-
----
-
-## License
-
-MIT
+**"Connection refused"**
+*   By default, it tries to connect to `http://127.0.0.1:8188`. If you run ComfyUI on a different port, check the `.comfyui_url` file in the custom node folder.

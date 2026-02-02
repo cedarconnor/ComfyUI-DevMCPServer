@@ -1,0 +1,13 @@
+
+# Python and ComfyUI artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.env
+.venv
+env/
+venv/
+
+# MCP Server
+.comfyui_url
