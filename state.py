@@ -4,7 +4,11 @@ This module is NOT reloaded during hot-reload, preserving data.
 """
 
 # Store the current workflow state (pushed from frontend or retrieved)
+# Contains: workflow (UI format), prompt (API format), timestamp
 current_workflow = {}
+
+# API-ready prompt (this is what can be sent to /prompt)
+current_prompt = None
 
 # Error history (max 20 entries)
 error_history = []

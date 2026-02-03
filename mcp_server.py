@@ -119,7 +119,7 @@ def get_workflow() -> dict:
     """Get current workflow."""
     # Try our custom endpoint first (from __init__.py)
     live = make_request("/mcp/workflow")
-    if live and "workflow" in live:
+    if live and ("workflow" in live or "prompt" in live):
         return live
         
     # Fallback to history
@@ -127,10 +127,21 @@ def get_workflow() -> dict:
     if history and "error" not in history:
         latest = list(history.keys())[-1] if history else None
         if latest:
+            entry = history[latest]
+            # Get prompt - ComfyUI stores it in different ways
+            prompt = entry.get("prompt", {})
+            
+            # Handle tuple/list wrapper: prompt can be (num, {actual_prompt})
+            if isinstance(prompt, (list, tuple)) and len(prompt) >= 2:
+                prompt = prompt[1] if isinstance(prompt[1], dict) else {}
+            elif not isinstance(prompt, dict):
+                prompt = {}
+                
             return {
                 "source": "history", 
-                "workflow": history[latest].get("prompt", {}),
-                "outputs": history[latest].get("outputs", {})
+                "workflow": prompt,
+                "prompt": prompt,  # Also provide as prompt for queue_workflow
+                "outputs": entry.get("outputs", {})
             }
             
     return {"message": "No workflow found"}
@@ -443,24 +454,29 @@ async def list_tools():
 async def call_tool(name: str, arguments: dict):
     if not arguments:
         arguments = {}
-        
-    if name == "get_workflow":
-        return [TextContent(type="text", text=json.dumps(get_workflow(), indent=2))]
-    elif name == "get_node_types":
-        return [TextContent(type="text", text=get_node_types(**arguments))]
-    elif name == "get_status":
-        return [TextContent(type="text", text=get_status())]
-    elif name == "queue_workflow":
-        return [TextContent(type="text", text=queue_workflow(**arguments))]
-    elif name == "get_logs":
-        return [TextContent(type="text", text=get_logs(**arguments))]
-    elif name == "get_last_error":
-        return [TextContent(type="text", text=get_last_error())]
-    elif name == "get_error_history":
-        return [TextContent(type="text", text=get_error_history())]
-    elif name == "check_workflow_health":
-        return [TextContent(type="text", text=check_health())]
-    return [TextContent(type="text", text=f"Unknown tool: {name}")]
+    
+    try:
+        if name == "get_workflow":
+            return [TextContent(type="text", text=json.dumps(get_workflow(), indent=2))]
+        elif name == "get_node_types":
+            return [TextContent(type="text", text=get_node_types(**arguments))]
+        elif name == "get_status":
+            return [TextContent(type="text", text=get_status())]
+        elif name == "queue_workflow":
+            return [TextContent(type="text", text=queue_workflow(**arguments))]
+        elif name == "get_logs":
+            return [TextContent(type="text", text=get_logs(**arguments))]
+        elif name == "get_last_error":
+            return [TextContent(type="text", text=get_last_error())]
+        elif name == "get_error_history":
+            return [TextContent(type="text", text=get_error_history())]
+        elif name == "check_workflow_health":
+            return [TextContent(type="text", text=check_health())]
+        return [TextContent(type="text", text=f"Unknown tool: {name}")]
+    except TypeError as e:
+        return [TextContent(type="text", text=f"Error: Invalid arguments for '{name}'. {str(e)}")]
+    except Exception as e:
+        return [TextContent(type="text", text=f"Error executing '{name}': {str(e)}")]
 
 async def run_server():
     # Run the server

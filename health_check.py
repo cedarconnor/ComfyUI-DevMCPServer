@@ -30,66 +30,121 @@ def check_workflow_health(workflow: Dict[str, Any]) -> Dict[str, Any]:
         })
         return result
     
-    # Handle nested workflow structure
+    # Handle nested structures from our state
     if "workflow" in workflow:
         workflow = workflow["workflow"]
+    if "prompt" in workflow and isinstance(workflow.get("prompt"), dict):
+        # If we have an API prompt, use that
+        workflow = workflow["prompt"]
     
-    # Get nodes (could be dict or list depending on format)
-    nodes = workflow if isinstance(workflow, dict) else {}
-    result["node_count"] = len(nodes)
+    # Detect format: UI format has "nodes" as a list, API format has node IDs as keys
+    is_ui_format = "nodes" in workflow and isinstance(workflow.get("nodes"), list)
     
-    if not nodes:
-        result["warnings"].append({
-            "type": "no_nodes",
-            "message": "Workflow contains no nodes"
-        })
-    
-    # Track connections for orphan detection
-    connected_inputs = set()
-    connected_outputs = set()
-    
-    for node_id, node_data in nodes.items():
-        if not isinstance(node_data, dict):
-            continue
-            
-        # Check for missing inputs
-        inputs = node_data.get("inputs", {})
-        class_type = node_data.get("class_type", "Unknown")
+    if is_ui_format:
+        # UI Format: { nodes: [...], links: [...], groups: [...], ... }
+        nodes_list = workflow.get("nodes", [])
+        result["node_count"] = len(nodes_list)
         
-        # Check for None/null required inputs (common issue)
-        for input_name, input_value in inputs.items():
-            if input_value is None:
+        if not nodes_list:
+            result["warnings"].append({
+                "type": "no_nodes",
+                "message": "Workflow contains no nodes"
+            })
+            result["summary"] = "⚠️ Workflow contains no nodes"
+            return result
+        
+        # Build node lookup by ID
+        nodes_by_id = {}
+        for node in nodes_list:
+            if isinstance(node, dict) and "id" in node:
+                nodes_by_id[node["id"]] = node
+        
+        # Check links for issues
+        links = workflow.get("links", [])
+        linked_nodes = set()
+        
+        for link in links:
+            if isinstance(link, list) and len(link) >= 4:
+                # link format: [link_id, source_node, source_slot, target_node, target_slot, type]
+                source_node = link[1]
+                target_node = link[3]
+                linked_nodes.add(source_node)
+                linked_nodes.add(target_node)
+        
+        # Find orphan nodes
+        all_ids = set(nodes_by_id.keys())
+        orphans = all_ids - linked_nodes
+        
+        # Exclude common source nodes
+        source_types = {"LoadImage", "LoadCheckpoint", "CheckpointLoaderSimple", "EmptyLatentImage", "CLIPTextEncode", "KSampler"}
+        
+        for orphan_id in orphans:
+            node = nodes_by_id.get(orphan_id, {})
+            node_type = node.get("type", "Unknown")
+            if node_type not in source_types:
                 result["warnings"].append({
-                    "type": "null_input",
-                    "node_id": node_id,
-                    "node_class": class_type,
-                    "input_name": input_name,
-                    "message": f"Node {node_id} ({class_type}) has null input '{input_name}'"
+                    "type": "orphan_node",
+                    "node_id": orphan_id,
+                    "node_class": node_type,
+                    "message": f"Node {orphan_id} ({node_type}) appears disconnected"
                 })
+    else:
+        # API Format: { "1": { class_type: ..., inputs: {...} }, "2": {...}, ... }
+        # Filter to only include node entries (skip non-dict values and meta keys)
+        nodes = {}
+        for k, v in workflow.items():
+            if isinstance(v, dict) and "class_type" in v:
+                nodes[k] = v
+        
+        result["node_count"] = len(nodes)
+        
+        if not nodes:
+            result["warnings"].append({
+                "type": "no_nodes",
+                "message": "Workflow contains no nodes (or unsupported format)"
+            })
+            result["summary"] = "⚠️ No valid nodes found"
+            return result
+        
+        # Track connections
+        connected_inputs = set()
+        connected_outputs = set()
+        
+        for node_id, node_data in nodes.items():
+            inputs = node_data.get("inputs", {})
+            class_type = node_data.get("class_type", "Unknown")
             
-            # Track connections (input_value is [node_id, output_index] for connections)
-            if isinstance(input_value, list) and len(input_value) == 2:
-                source_node = str(input_value[0])
-                connected_outputs.add(source_node)
-                connected_inputs.add(node_id)
-    
-    # Find orphan nodes (nodes with no connections to other nodes)
-    all_node_ids = set(str(nid) for nid in nodes.keys())
-    orphans = all_node_ids - connected_inputs - connected_outputs
-    
-    # Exclude common source nodes that don't need inputs
-    source_node_types = {"LoadImage", "LoadCheckpoint", "KSampler", "EmptyLatent", "CLIPTextEncode"}
-    
-    for orphan_id in orphans:
-        node_data = nodes.get(orphan_id) or nodes.get(int(orphan_id), {})
-        if isinstance(node_data, dict):
+            for input_name, input_value in inputs.items():
+                if input_value is None:
+                    result["warnings"].append({
+                        "type": "null_input",
+                        "node_id": node_id,
+                        "node_class": class_type,
+                        "input_name": input_name,
+                        "message": f"Node {node_id} ({class_type}) has null input '{input_name}'"
+                    })
+                
+                # Track connections
+                if isinstance(input_value, list) and len(input_value) == 2:
+                    source_node = str(input_value[0])
+                    connected_outputs.add(source_node)
+                    connected_inputs.add(node_id)
+        
+        # Find orphans
+        all_node_ids = set(str(nid) for nid in nodes.keys())
+        orphans = all_node_ids - connected_inputs - connected_outputs
+        
+        source_types = {"LoadImage", "LoadCheckpoint", "CheckpointLoaderSimple", "EmptyLatentImage", "CLIPTextEncode", "KSampler"}
+        
+        for orphan_id in orphans:
+            node_data = nodes.get(orphan_id, {})
             class_type = node_data.get("class_type", "")
-            if class_type not in source_node_types:
+            if class_type not in source_types:
                 result["warnings"].append({
                     "type": "orphan_node",
                     "node_id": orphan_id,
                     "node_class": class_type,
-                    "message": f"Node {orphan_id} ({class_type}) appears disconnected from the workflow"
+                    "message": f"Node {orphan_id} ({class_type}) appears disconnected"
                 })
     
     # Set overall health
