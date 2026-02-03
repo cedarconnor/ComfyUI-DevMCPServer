@@ -1,26 +1,34 @@
 # ComfyUI-MCP-Server
 
-**Your AI Agent's Gateway to ComfyUI.**
+**Your AI Assistant's Direct Line to ComfyUI.**
 
-This tool lets your favorite AI coding assistant (Claude, Cursor, Windsurf, etc.) "talk" directly to ComfyUI. This means your agent can:
-- 🚫 **See Errors automatically** without you copying logs.
-- 🧐 **Understand your workflow** by reading the node graph.
-- 🚀 **Run and fix workflows** directly from the chat.
+This tool lets AI assistants like Claude, Cursor, Windsurf, and Gemini "talk" directly to ComfyUI. Instead of you copying error messages or describing your workflow, your AI can see it all automatically.
 
-It works by running a small "Server" that speaks the **Model Context Protocol (MCP)**, a standard language for AI tools.
+---
+
+## ✨ What Can Your AI Do With This?
+
+Once connected, your AI assistant gains powerful superpowers:
+
+| Ask Your AI... | What Happens |
+|----------------|--------------|
+| "Why did that fail?" | AI reads the error, identifies the problem node, and suggests a fix |
+| "Check my workflow before I run it" | AI scans for missing connections or potential issues |
+| "What's in my current workflow?" | AI reads your node graph and can explain or improve it |
+| "Find a node that does X" | AI searches through all your installed nodes |
+| "Is ComfyUI busy right now?" | AI checks the queue and system resources |
+| "Run my workflow" | AI queues it for execution |
 
 ---
 
 ## 📦 Installation
 
-This project is installed as a **ComfyUI Custom Node**.
+### Option 1: ComfyUI Manager (Recommended)
+*Coming soon!*
 
-### Option 1: Manager (Recommended)
-*Coming soon to ComfyUI Manager!*
-
-### Option 2: Manual Install (Git)
-1.  Open your terminal/command prompt.
-2.  Navigate to your ComfyUI custom nodes folder:
+### Option 2: Manual Install
+1.  Open your terminal
+2.  Go to your ComfyUI custom nodes folder:
     ```bash
     cd /path/to/ComfyUI/custom_nodes
     ```
@@ -28,16 +36,16 @@ This project is installed as a **ComfyUI Custom Node**.
     ```bash
     git clone https://github.com/cedarconnor/ComfyUI-DevMCPServer.git
     ```
-4.  **Restart ComfyUI**.
+4.  **Restart ComfyUI**
 
 ---
 
-## 🤖 Connect Your Agent
+## 🤖 Connect Your AI Assistant
 
-Once installed, you need to tell your AI Agent where to find this server.
+Add this server to your AI tool's MCP configuration.
 
-### 🟣 Claude Desktop / Claude Code
-Add this to your `claude_desktop_config.json`:
+### Claude Desktop / Claude Code
+Add to `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
@@ -48,74 +56,150 @@ Add this to your `claude_desktop_config.json`:
   }
 }
 ```
-*(Replace `/path/to/...` with the actual path to the folder)*
 
-### 🔵 Cursor
-1.  Go to **Settings** > **Features** > **MCP Servers**.
-2.  Click **+ Add New MCP Server**.
-3.  Fill in the details:
-    *   **Name**: `comfyui`
-    *   **Type**: `command`
-    *   **Command**: `python /path/to/ComfyUI/custom_nodes/ComfyUI-DevMCPServer/mcp_server.py`
+### Cursor
+1.  Go to **Settings** → **Features** → **MCP Servers**
+2.  Click **+ Add New MCP Server**
+3.  Fill in:
+    - **Name**: `comfyui`
+    - **Type**: `command`
+    - **Command**: `python /path/to/ComfyUI/custom_nodes/ComfyUI-DevMCPServer/mcp_server.py`
 
-### 🌊 Windsurf / Gemini / Other CLI
-Most CLI agents accept an MCP configuration flag or config file. Use the command:
+### Other AI Tools (Windsurf, Gemini CLI, etc.)
+Use this command:
 ```bash
 python /path/to/ComfyUI/custom_nodes/ComfyUI-DevMCPServer/mcp_server.py
 ```
 
+> **Important**: Replace `/path/to/ComfyUI` with the actual path on your computer!
+
 ---
 
-## 🛠 Features & Usage
+## 🛠️ All Available Tools
 
-Once connected, you can ask your agent to do things like:
+Your AI has access to these tools:
 
-### 1. "What is in my workflow?"
-The agent uses **`get_workflow`** to see your current node graph. It can explain what your workflow does or suggest improvements.
+### Workflow Tools
+| Tool | What It Does |
+|------|--------------|
+| `get_workflow` | Reads your current workflow (the nodes and connections you see in ComfyUI) |
+| `queue_workflow` | Runs your workflow (same as clicking "Queue Prompt") |
+| `check_workflow_health` | Scans your workflow for problems like missing connections or null inputs |
 
-### 2. "Fix this error"
-If a generation fails, just ask "Why did that fail?". The agent uses **`get_last_error`** to see the exact error with:
-- 📍 File location and line number
-- 🔧 Which node caused the error
-- 💡 **Automatic fix suggestions** from 20+ known error patterns
+### Debugging Tools
+| Tool | What It Does |
+|------|--------------|
+| `get_last_error` | Gets the most recent error with:<br>• The exact file and line number<br>• Which **node** caused the problem<br>• A **suggested fix** from 20+ known error patterns |
+| `get_error_history` | Shows a summary of recent errors |
+| `get_logs` | Reads the raw ComfyUI log output |
 
-### 3. "Is my workflow healthy?"
-Before running, ask "Check my workflow". The agent uses **`check_workflow_health`** to find:
-- Missing or null inputs
-- Disconnected nodes
-- Potential issues
+### Information Tools
+| Tool | What It Does |
+|------|--------------|
+| `get_node_types` | Searches installed nodes (e.g., "find IPAdapter nodes") |
+| `get_status` | Shows queue status, running jobs, GPU memory usage |
 
-### 4. "Find a node for..."
-Ask "Is there a node for IPAdapter?". The agent uses **`get_node_types`** to search your installed nodes.
+---
 
-### 5. "Check status"
-Ask "Is the queue full?". The agent uses **`get_status`** to see running jobs, VRAM usage, and more.
+## 🔧 Example Conversations
+
+**Debugging an Error:**
+> **You:** "My generation just failed. What happened?"
+> 
+> **AI:** *Uses `get_last_error`*
+> 
+> "The error was a **CUDA Out of Memory** in the KSampler node (ID: 42). Try reducing your image resolution from 1024 to 768, or enable `--lowvram` mode."
+
+**Checking Before Running:**
+> **You:** "Is my workflow ready to run?"
+> 
+> **AI:** *Uses `check_workflow_health`*
+> 
+> "⚠️ Found 2 warnings: Node 15 (ControlNet) has a null input for 'image'. Node 23 appears disconnected from the rest of the workflow."
+
+**Finding a Node:**
+> **You:** "Is there a node for upscaling images?"
+> 
+> **AI:** *Uses `get_node_types`*
+> 
+> "Yes! You have several upscale nodes installed: ImageUpscaleWithModel, UpscaleImage, and UltimateSDUpscale from the Ultimate SD Upscale pack."
 
 ---
 
 ## ❓ Troubleshooting
 
-**"MCP Server connection failed"**
-*   Make sure you used the full absolute path to `mcp_server.py`.
-*   Ensure you have Python installed and accessible.
-
-**"No workflow found"**
-*   Make sure ComfyUI is running.
-*   The server needs to be installed as a Custom Node (in `custom_nodes` folder) for it to see the live workflow.
-
-**"Connection refused"**
-*   By default, it tries to connect to `http://127.0.0.1:8188`. If you run ComfyUI on a different port, check the `.comfyui_url` file in the custom node folder.
-
+| Problem | Solution |
+|---------|----------|
+| "MCP Server connection failed" | Make sure you used the **full absolute path** to `mcp_server.py` |
+| "No workflow found" | Make sure ComfyUI is running and you have a workflow open |
+| "Connection refused" | ComfyUI might be on a different port. Check the `.comfyui_url` file in this folder |
 
 ---
 
-## 🧑‍💻 For Developers
+## 🧑‍💻 For Developers: Hot Reload
 
-This node includes a **Integrated Hot Reload** mechanism.
+This project includes a **hot reload** feature that makes development much faster. You can change the code while ComfyUI is running, and your changes take effect immediately — no restart needed!
 
--   **Logic**: `handlers.py` (Edit this! It reloads instantly).
--   **State**: `state.py` (Stores data like the workflow. Persists across reloads).
+### How It Works
 
-This means you can modify the API logic in real-time without losing your current test data.
+The code is split into two parts:
 
-For general Custom Node development, we recommend [ComfyUI_devtools](https://github.com/Comfy-Org/ComfyUI_devtools), which provides comprehensive hot-reload and profiling tools for the entire ComfyUI ecosystem.
+| File | Purpose | Hot Reloads? |
+|------|---------|--------------|
+| `handlers.py` | All the API logic (this is where you make changes) | ✅ **Yes** |
+| `state.py` | Data storage (your workflow, error history) | ❌ No (data persists) |
+
+When ComfyUI receives an API request, it automatically reloads `handlers.py`. This means:
+
+1. **Edit** `handlers.py`
+2. **Save** the file
+3. **Make an API call** (or ask your AI to do something)
+4. Your changes are now live!
+
+Your data (like the current workflow) stays safe in `state.py` and isn't affected by reloads.
+
+### Example: Adding a New Feature
+
+Let's say you want to add a "ping" endpoint that just returns "pong":
+
+1. Open `handlers.py`
+2. Add this function:
+   ```python
+   async def ping_handler(request):
+       return web.json_response({"message": "pong"})
+   ```
+3. Save the file
+4. The next API request will use your new code!
+
+### For Broader Custom Node Development
+
+If you're developing other custom nodes (not just this MCP server), we recommend [ComfyUI_devtools](https://github.com/Comfy-Org/ComfyUI_devtools). It provides hot-reload for the entire ComfyUI ecosystem.
+
+---
+
+## 📁 Project Structure
+
+```
+ComfyUI-DevMCPServer/
+├── mcp_server.py        # MCP server (AI connects here)
+├── __init__.py          # ComfyUI custom node setup
+├── handlers.py          # API handlers (edit this for hot reload!)
+├── state.py             # Persistent data storage
+├── error_parser.py      # Extracts error details from tracebacks
+├── pattern_matcher.py   # 20+ error patterns with fix suggestions
+├── health_check.py      # Workflow validation logic
+└── js/
+    └── mcp_bridge.js    # Syncs your workflow to the server
+```
+
+---
+
+## 📄 License
+
+MIT License - feel free to use and modify!
+
+---
+
+## 🤝 Contributing
+
+Found a bug? Have an idea? Open an issue or PR on [GitHub](https://github.com/cedarconnor/ComfyUI-DevMCPServer)!
