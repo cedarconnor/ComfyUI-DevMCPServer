@@ -174,11 +174,14 @@ def get_status() -> str:
     
     lines = []
     
+    
     # Queue
     if "error" not in queue:
         running = queue.get("queue_running", [])
         pending = queue.get("queue_pending", [])
         lines.append(f"Queue: {len(running)} running, {len(pending)} pending")
+    else:
+        lines.append(f"Queue Error: {queue['error']}")
     
     # System
     if "error" not in stats:
@@ -188,6 +191,8 @@ def get_status() -> str:
             vram_total = dev.get("vram_total", 0) / (1024**3)
             vram_free = dev.get("vram_free", 0) / (1024**3)
             lines.append(f"GPU: {dev.get('name')} | VRAM: {vram_total - vram_free:.1f}/{vram_total:.1f} GB Used")
+    else:
+        lines.append(f"System Stats Error: {stats['error']}")
             
     return "\n".join(lines)
 
@@ -219,11 +224,18 @@ def get_logs(count: int = 50) -> str:
     # 2. current dir
     # 3. Parent dir (ComfyUI root if we are in custom_nodes/ComfyUI-DevMCPServer)
     
+    
     log_file = os.environ.get("COMFYUI_LOG")
+    
+    # Calculate paths relative to this script
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    
     search_paths = [
         "comfyui.log",
-        "../../comfyui.log",
-        "../../../comfyui.log"
+        "../../comfyui.log", 
+        "../../../comfyui.log",
+        os.path.join(base_dir, "comfyui.log"),
+        os.path.abspath(os.path.join(base_dir, "../../comfyui.log")), # ../../ from custom_nodes/ComfyUI-DevMCPServer
     ]
     
     if not log_file:
@@ -248,11 +260,116 @@ def queue_workflow(workflow: dict) -> str:
     # If the input is already having "prompt" key, use it directly (legacy support)
     if "prompt" in workflow:
         data = workflow
+    elif "workflow" in workflow:
+        # Handle output from get_workflow
+        data = {"prompt": workflow["workflow"]}
         
     res = make_request("/prompt", method="POST", data=data)
     if "error" in res:
         return f"Error queuing workflow: {res['error']}"
     return f"Workflow queued. Prompt ID: {res.get('prompt_id')}"
+
+def get_last_error() -> str:
+    """Get the last error with full context and suggestions."""
+    import os
+    import sys
+    
+    # Import our new modules
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
+    
+    from error_parser import parse_traceback, format_error_summary
+    from pattern_matcher import match_error
+    
+    # First, try to get errors from logs
+    logs = get_logs(count=100)
+    
+    # Look for traceback in logs
+    traceback_text = None
+    if "Traceback" in logs:
+        # Extract the traceback
+        lines = logs.split('\n')
+        in_traceback = False
+        tb_lines = []
+        
+        for line in lines:
+            if 'Traceback (most recent call last)' in line:
+                in_traceback = True
+                tb_lines = [line]
+            elif in_traceback:
+                tb_lines.append(line)
+                # End of traceback (line with error type)
+                if line.strip() and not line.startswith(' ') and ':' in line:
+                    break
+        
+        if tb_lines:
+            traceback_text = '\n'.join(tb_lines)
+    
+    if not traceback_text:
+        return "No recent errors found in logs."
+    
+    # Parse the error
+    parsed = parse_traceback(traceback_text)
+    summary = format_error_summary(parsed)
+    
+    # Try to match against patterns
+    pattern_match = match_error(traceback_text)
+    if pattern_match:
+        summary += f"\n\n💡 **{pattern_match['title']}**\n{pattern_match['suggestion']}"
+    
+    return summary
+
+def get_error_history() -> str:
+    """Get the error history."""
+    import os
+    import sys
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
+    
+    # For now, scan logs for multiple tracebacks
+    logs = get_logs(count=500)
+    
+    if "Traceback" not in logs:
+        return "No errors found in recent logs."
+    
+    # Count tracebacks
+    traceback_count = logs.count('Traceback (most recent call last)')
+    
+    # Get unique error types
+    import re
+    error_types = re.findall(r'^(\w+Error|\w+Exception):', logs, re.MULTILINE)
+    unique_errors = list(set(error_types))
+    
+    result = f"Found {traceback_count} error(s) in recent logs.\n"
+    if unique_errors:
+        result += f"Error types: {', '.join(unique_errors[:5])}"
+        if len(unique_errors) > 5:
+            result += f" (+{len(unique_errors) - 5} more)"
+    
+    result += "\n\nUse `get_last_error` for detailed analysis of the most recent error."
+    
+    return result
+
+def check_health() -> str:
+    """Check the current workflow for potential issues."""
+    import os
+    import sys
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
+    
+    from health_check import check_workflow_health, format_health_report
+    
+    workflow = get_workflow()
+    if not workflow or "workflow" not in workflow:
+        return "No workflow loaded. Open a workflow in ComfyUI first."
+    
+    health_result = check_workflow_health(workflow)
+    return format_health_report(health_result)
 
 # =============================================================================
 # MCP Server Setup
@@ -305,11 +422,28 @@ async def list_tools():
                 }
             }
         ),
-        # Add more tools as we implement them
+        Tool(
+            name="get_last_error",
+            description="Get the last error with context and fix suggestions.",
+            inputSchema={"type": "object", "properties": {}}
+        ),
+        Tool(
+            name="get_error_history",
+            description="Get a summary of recent errors.",
+            inputSchema={"type": "object", "properties": {}}
+        ),
+        Tool(
+            name="check_workflow_health",
+            description="Analyze the current workflow for potential issues before running.",
+            inputSchema={"type": "object", "properties": {}}
+        ),
     ]
 
 @server.call_tool()
 async def call_tool(name: str, arguments: dict):
+    if not arguments:
+        arguments = {}
+        
     if name == "get_workflow":
         return [TextContent(type="text", text=json.dumps(get_workflow(), indent=2))]
     elif name == "get_node_types":
@@ -320,12 +454,22 @@ async def call_tool(name: str, arguments: dict):
         return [TextContent(type="text", text=queue_workflow(**arguments))]
     elif name == "get_logs":
         return [TextContent(type="text", text=get_logs(**arguments))]
+    elif name == "get_last_error":
+        return [TextContent(type="text", text=get_last_error())]
+    elif name == "get_error_history":
+        return [TextContent(type="text", text=get_error_history())]
+    elif name == "check_workflow_health":
+        return [TextContent(type="text", text=check_health())]
     return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
-async def main():
+async def run_server():
     # Run the server
     async with stdio_server() as (read, write):
         await server.run(read, write, server.create_initialization_options())
 
+def main():
+    """Synchronous entrypoint for CLI scripts."""
+    asyncio.run(run_server())
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

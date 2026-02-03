@@ -74,13 +74,22 @@ Once connected, you can ask your agent to do things like:
 The agent uses **`get_workflow`** to see your current node graph. It can explain what your workflow does or suggest improvements.
 
 ### 2. "Fix this error"
-If a generation fails, just ask "Why did that fail?". The agent skips the guessing game and uses **`get_status`** and log reading tools to see the exact error message and traceback from ComfyUI.
+If a generation fails, just ask "Why did that fail?". The agent uses **`get_last_error`** to see the exact error with:
+- 📍 File location and line number
+- 🔧 Which node caused the error
+- 💡 **Automatic fix suggestions** from 20+ known error patterns
 
-### 3. "Find a node for..."
-Ask "Is there a node for IPAdapter?". The agent uses **`get_node_types`** to search your installed nodes and find the right one for the job.
+### 3. "Is my workflow healthy?"
+Before running, ask "Check my workflow". The agent uses **`check_workflow_health`** to find:
+- Missing or null inputs
+- Disconnected nodes
+- Potential issues
 
-### 4. "Check status"
-Ask "Is the queue full?". The agent can check **`get_status`** to see running jobs, system resources (VRAM/RAM), and more.
+### 4. "Find a node for..."
+Ask "Is there a node for IPAdapter?". The agent uses **`get_node_types`** to search your installed nodes.
+
+### 5. "Check status"
+Ask "Is the queue full?". The agent uses **`get_status`** to see running jobs, VRAM usage, and more.
 
 ---
 
