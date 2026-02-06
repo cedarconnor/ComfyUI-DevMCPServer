@@ -6,6 +6,7 @@ import os
 import json
 import importlib
 from . import handlers
+from comfy.cli_args import args
 
 # Define the directory for the node (standard boilerplate)
 NODE_CLASS_MAPPINGS = {}
@@ -41,9 +42,9 @@ def setup_routes():
 
 def write_connection_info():
     """Write the ComfyUI URL to a file for mcp_server.py to use."""
-    s = server.PromptServer.instance
-    port = s.port
-    address = s.address
+    # Get port and address from CLI args (not stored on PromptServer instance)
+    port = args.port
+    address = args.listen
     # Handle 0.0.0.0 case
     if address == "0.0.0.0":
         address = "127.0.0.1"
