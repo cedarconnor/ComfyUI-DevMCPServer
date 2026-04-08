@@ -36,7 +36,11 @@ Once connected, your AI assistant gains powerful superpowers:
     ```bash
     git clone https://github.com/cedarconnor/ComfyUI-DevMCPServer.git
     ```
-4.  **Restart ComfyUI**
+4.  Install the Python dependencies:
+    ```bash
+    pip install mcp httpx watchdog
+    ```
+5.  **Restart ComfyUI**
 
 ---
 
@@ -44,8 +48,24 @@ Once connected, your AI assistant gains powerful superpowers:
 
 Add this server to your AI tool's MCP configuration.
 
-### Claude Desktop / Claude Code
+### Claude Code (CLI)
+Add to `~/.claude/.mcp.json` (user-level, all projects) or `.mcp.json` in your project root:
+```json
+{
+  "mcpServers": {
+    "comfyui": {
+      "command": "python",
+      "args": ["/path/to/ComfyUI/custom_nodes/ComfyUI-DevMCPServer/mcp_server.py"]
+    }
+  }
+}
+```
+
+### Claude Desktop
 Add to `claude_desktop_config.json`:
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
 ```json
 {
   "mcpServers": {
